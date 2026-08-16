@@ -7,6 +7,8 @@ const state = {
   loaded: false
 };
 
+const calendarState = { year: new Date().getFullYear(), month: new Date().getMonth() }; // month: 0-11
+
 const $app = document.getElementById('app');
 
 // ---------- Utilidades ----------
@@ -37,6 +39,21 @@ function categoriaById(id) {
 function coberturaByCategoria(id) {
   return state.coberturas.find(c => c.categoria_id === id);
 }
+function showToast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.remove('show');
+  void el.offsetWidth; // reinicia la animación si se pulsa varias veces seguidas
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
 
 // ---------- Router ----------
 
@@ -57,6 +74,7 @@ function route() {
   if (hash.startsWith('#/tratamientos/nuevo')) renderTratamientoForm(null);
   else if (hash.startsWith('#/tratamientos/editar/')) renderTratamientoForm(hash.split('/').pop());
   else if (hash.startsWith('#/tratamientos')) renderTratamientos();
+  else if (hash.startsWith('#/calendario')) renderCalendario();
   else if (hash.startsWith('#/seguro')) renderSeguro();
   else if (hash.startsWith('#/ajustes')) renderAjustes();
   else renderDashboard();
@@ -89,6 +107,7 @@ function layout(title, content) {
         <nav class="tabs">
           <a href="#/dashboard" class="${navActive('dashboard')}">Resumen</a>
           <a href="#/tratamientos" class="${navActive('tratamientos')}">Tratamientos</a>
+          <a href="#/calendario" class="${navActive('calendario')}">Calendario</a>
           <a href="#/seguro" class="${navActive('seguro')}">Seguro</a>
           <a href="#/ajustes" class="${navActive('ajustes')}">Ajustes</a>
         </nav>
@@ -333,15 +352,85 @@ function renderTratamientoForm(id) {
     location.hash = '#/tratamientos';
     await loadData();
     route();
+    showToast('Tratamiento guardado ✓');
   });
 }
 
 async function onDeleteTratamiento(id) {
   if (!confirm('¿Borrar este tratamiento? No se puede deshacer.')) return;
-  await Api.deleteTratamiento(id);
+  const res = await Api.deleteTratamiento(id);
+  if (res.error) { alert('No se ha podido borrar: ' + res.error); return; }
   state.loaded = false;
   await loadData();
   route();
+  showToast('Tratamiento borrado');
+}
+
+// ---------- Calendario ----------
+
+function shiftCalendar(delta) {
+  let m = calendarState.month + delta;
+  let y = calendarState.year;
+  if (m < 0) { m = 11; y--; }
+  if (m > 11) { m = 0; y++; }
+  calendarState.month = m;
+  calendarState.year = y;
+  renderCalendario();
+}
+
+function renderCalendario() {
+  const { year, month } = calendarState;
+  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+  const firstOfMonth = new Date(year, month, 1);
+  // getDay(): 0=domingo..6=sábado; lo convertimos a que la semana empiece en lunes
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Agrupa tratamientos con próxima fecha por día (YYYY-MM-DD)
+  const porDia = {};
+  state.tratamientos.forEach(t => {
+    if (!t.proxima_fecha) return;
+    porDia[t.proxima_fecha] = porDia[t.proxima_fecha] || [];
+    porDia[t.proxima_fecha].push(t);
+  });
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push('<div class="cal-cell empty"></div>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const eventos = porDia[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    cells.push(`
+      <div class="cal-cell ${isToday ? 'today' : ''} ${eventos.length ? 'has-events' : ''}">
+        <div class="cal-daynum">${d}</div>
+        ${eventos.map(t => `
+          <div class="cal-event" style="background:${categoriaById(t.categoria_id).color}22;color:${categoriaById(t.categoria_id).color}" title="${categoriaById(t.categoria_id).nombre} — ${t.descripcion || ''}">
+            ${categoriaById(t.categoria_id).nombre}
+          </div>
+        `).join('')}
+      </div>
+    `);
+  }
+
+  const content = `
+    <div class="cal-header">
+      <button class="btn" onclick="shiftCalendar(-1)">‹ Anterior</button>
+      <div class="cal-title">${MESES[month]} ${year}</div>
+      <button class="btn" onclick="shiftCalendar(1)">Siguiente ›</button>
+    </div>
+    <div class="cal-grid cal-grid-labels">
+      ${DIAS.map(d => `<div class="cal-daylabel">${d}</div>`).join('')}
+    </div>
+    <div class="cal-grid">
+      ${cells.join('')}
+    </div>
+    <p class="muted" style="margin-top:14px;">Cada bloque de color es un tratamiento con recordatorio para ese día. Para cambiar la fecha, edítalo desde la pestaña Tratamientos.</p>
+  `;
+  $app.innerHTML = layout('Calendario', content);
 }
 
 // ---------- Seguro ----------
@@ -405,6 +494,7 @@ function renderSeguro() {
     state.loaded = false;
     await loadData();
     route();
+    showToast('Póliza guardada ✓');
   });
 }
 
@@ -417,6 +507,7 @@ async function onSaveCobertura(categoriaId) {
   state.loaded = false;
   await loadData();
   route();
+  showToast('Cobertura guardada ✓');
 }
 
 // ---------- Ajustes ----------
