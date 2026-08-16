@@ -1,0 +1,445 @@
+const state = {
+  categorias: [],
+  seguro: null,
+  coberturas: [],
+  tratamientos: [],
+  usuarios: [],
+  loaded: false
+};
+
+const $app = document.getElementById('app');
+
+// ---------- Utilidades ----------
+
+function fmtEUR(n) {
+  return (Number(n) || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function addMonths(dateStr, months) {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + Number(months || 0));
+  return d.toISOString().slice(0, 10);
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86400000);
+}
+function categoriaById(id) {
+  return state.categorias.find(c => c.id === id) || { nombre: 'Sin categoría', color: '#999' };
+}
+function coberturaByCategoria(id) {
+  return state.coberturas.find(c => c.categoria_id === id);
+}
+
+// ---------- Router ----------
+
+function route() {
+  const hash = location.hash || '#/dashboard';
+  const session = Api.loadSession();
+
+  if (!session) {
+    renderLogin();
+    return;
+  }
+  if (!state.loaded) {
+    renderLoading();
+    loadData().then(route);
+    return;
+  }
+
+  if (hash.startsWith('#/tratamientos/nuevo')) renderTratamientoForm(null);
+  else if (hash.startsWith('#/tratamientos/editar/')) renderTratamientoForm(hash.split('/').pop());
+  else if (hash.startsWith('#/tratamientos')) renderTratamientos();
+  else if (hash.startsWith('#/seguro')) renderSeguro();
+  else if (hash.startsWith('#/ajustes')) renderAjustes();
+  else renderDashboard();
+}
+window.addEventListener('hashchange', route);
+
+async function loadData() {
+  const res = await Api.bootstrap();
+  if (res.error) { Api.clearSession(); return; }
+  state.categorias = res.categorias || [];
+  state.seguro = res.seguro || null;
+  state.coberturas = res.coberturas || [];
+  state.tratamientos = res.tratamientos || [];
+  state.usuarios = res.usuarios || [];
+  state.loaded = true;
+}
+
+function renderLoading() {
+  $app.innerHTML = `<div class="loading">Cargando datos de Pistacho…</div>`;
+}
+
+// ---------- Layout ----------
+
+function layout(title, content) {
+  const s = Api.session;
+  return `
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">🐾 Pistacho</div>
+        <nav class="tabs">
+          <a href="#/dashboard" class="${navActive('dashboard')}">Resumen</a>
+          <a href="#/tratamientos" class="${navActive('tratamientos')}">Tratamientos</a>
+          <a href="#/seguro" class="${navActive('seguro')}">Seguro</a>
+          <a href="#/ajustes" class="${navActive('ajustes')}">Ajustes</a>
+        </nav>
+        <div class="user-chip" title="${s.email}">${s.nombre || s.email}</div>
+      </header>
+      <main class="content">
+        <h1>${title}</h1>
+        ${content}
+      </main>
+    </div>
+  `;
+}
+function navActive(name) {
+  return location.hash.startsWith(`#/${name}`) ? 'active' : '';
+}
+
+// ---------- Login ----------
+
+function renderLogin() {
+  $app.innerHTML = `
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="login-icon">🐾</div>
+        <h1>Pistacho</h1>
+        <p>Gestión médica y de seguro</p>
+        <div id="g_id_signin"></div>
+        <p id="login-error" class="error"></p>
+      </div>
+    </div>
+  `;
+  initGoogleSignIn();
+}
+
+function initGoogleSignIn() {
+  if (!window.google || !google.accounts) {
+    setTimeout(initGoogleSignIn, 200);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: CONFIG.GOOGLE_CLIENT_ID,
+    callback: onGoogleCredential
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('g_id_signin'),
+    { theme: 'filled_black', size: 'large', text: 'signin_with', shape: 'pill' }
+  );
+}
+
+async function onGoogleCredential(response) {
+  try {
+    await Api.login(response.credential);
+    state.loaded = false;
+    location.hash = '#/dashboard';
+    route();
+  } catch (e) {
+    document.getElementById('login-error').textContent =
+      'No se ha podido iniciar sesión: tu cuenta no está autorizada o hubo un error de red.';
+  }
+}
+
+function logout() {
+  Api.clearSession();
+  state.loaded = false;
+  location.hash = '#/login';
+  route();
+}
+
+// ---------- Dashboard ----------
+
+function renderDashboard() {
+  const total = state.tratamientos.reduce((s, t) => s + (Number(t.coste) || 0), 0);
+  const reembolsado = state.tratamientos.reduce((s, t) => s + (Number(t.importe_reembolsado) || 0), 0);
+  const aCargo = total - reembolsado;
+
+  const porCategoria = {};
+  state.tratamientos.forEach(t => {
+    const cat = categoriaById(t.categoria_id).nombre;
+    porCategoria[cat] = porCategoria[cat] || { coste: 0, reembolsado: 0 };
+    porCategoria[cat].coste += Number(t.coste) || 0;
+    porCategoria[cat].reembolsado += Number(t.importe_reembolsado) || 0;
+  });
+  const maxCoste = Math.max(1, ...Object.values(porCategoria).map(c => c.coste));
+
+  const proximos = state.tratamientos
+    .filter(t => t.proxima_fecha)
+    .map(t => ({ ...t, dias: daysUntil(t.proxima_fecha) }))
+    .filter(t => t.dias !== null && t.dias <= 30)
+    .sort((a, b) => a.dias - b.dias);
+
+  const content = `
+    <div class="cards">
+      <div class="card"><div class="card-label">Gastado en total</div><div class="card-value">${fmtEUR(total)}</div></div>
+      <div class="card"><div class="card-label">Reembolsado por el seguro</div><div class="card-value good">${fmtEUR(reembolsado)}</div></div>
+      <div class="card"><div class="card-label">A tu cargo</div><div class="card-value">${fmtEUR(aCargo)}</div></div>
+    </div>
+
+    <section class="panel">
+      <h2>Próximos tratamientos</h2>
+      ${proximos.length === 0 ? '<p class="muted">No hay tratamientos previstos en los próximos 30 días.</p>' : `
+        <ul class="reminder-list">
+          ${proximos.map(t => `
+            <li class="${t.dias < 0 ? 'overdue' : t.dias <= 7 ? 'soon' : ''}">
+              <span class="dot" style="background:${categoriaById(t.categoria_id).color}"></span>
+              <div class="reminder-body">
+                <strong>${categoriaById(t.categoria_id).nombre}</strong> — ${t.descripcion || ''}
+                <div class="muted">${fmtDate(t.proxima_fecha)} · ${t.dias < 0 ? `${Math.abs(t.dias)} días de retraso` : t.dias === 0 ? 'hoy' : `en ${t.dias} días`}</div>
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      `}
+    </section>
+
+    <section class="panel">
+      <h2>Gasto por categoría</h2>
+      ${Object.keys(porCategoria).length === 0 ? '<p class="muted">Aún no hay tratamientos registrados.</p>' : `
+        <div class="bars">
+          ${Object.entries(porCategoria).map(([nombre, v]) => `
+            <div class="bar-row">
+              <div class="bar-label">${nombre}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${(v.coste / maxCoste) * 100}%"></div>
+              </div>
+              <div class="bar-value">${fmtEUR(v.coste)} <span class="muted">(reembolsado ${fmtEUR(v.reembolsado)})</span></div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </section>
+  `;
+  $app.innerHTML = layout('Resumen', content);
+}
+
+// ---------- Tratamientos ----------
+
+function renderTratamientos() {
+  const rows = [...state.tratamientos].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const content = `
+    <div class="toolbar">
+      <a href="#/tratamientos/nuevo" class="btn primary">+ Nuevo tratamiento</a>
+    </div>
+    <table class="table">
+      <thead>
+        <tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Coste</th><th>Seguro</th><th>Reembolsado</th><th>Próxima vez</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${rows.map(t => `
+          <tr>
+            <td>${fmtDate(t.fecha)}</td>
+            <td><span class="tag" style="background:${categoriaById(t.categoria_id).color}22;color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
+            <td>${t.descripcion || ''}</td>
+            <td>${fmtEUR(t.coste)}</td>
+            <td>${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
+            <td>${fmtEUR(t.importe_reembolsado)}</td>
+            <td>${fmtDate(t.proxima_fecha)}</td>
+            <td class="row-actions">
+              <a href="#/tratamientos/editar/${t.id}">Editar</a>
+              <a href="#" onclick="onDeleteTratamiento('${t.id}');return false;">Borrar</a>
+            </td>
+          </tr>
+        `).join('') || `<tr><td colspan="8" class="muted">Todavía no hay tratamientos.</td></tr>`}
+      </tbody>
+    </table>
+  `;
+  $app.innerHTML = layout('Tratamientos', content);
+}
+
+function renderTratamientoForm(id) {
+  const editing = id ? state.tratamientos.find(t => t.id === id) : null;
+  const cobertura = editing ? coberturaByCategoria(editing.categoria_id) : null;
+
+  const content = `
+    <form id="tratamiento-form" class="form">
+      <label>Fecha
+        <input type="date" name="fecha" required value="${editing ? editing.fecha : new Date().toISOString().slice(0, 10)}">
+      </label>
+      <label>Categoría
+        <select name="categoria_id" required>
+          ${state.categorias.map(c => `<option value="${c.id}" ${editing && editing.categoria_id === c.id ? 'selected' : ''}>${c.nombre}</option>`).join('')}
+        </select>
+      </label>
+      <label>Descripción
+        <input type="text" name="descripcion" placeholder="Ej: Vacuna polivalente anual" value="${editing ? editing.descripcion || '' : ''}">
+      </label>
+      <label>Coste (€)
+        <input type="number" step="0.01" min="0" name="coste" required value="${editing ? editing.coste : ''}">
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="cubierto_seguro" ${editing ? (editing.cubierto_seguro ? 'checked' : '') : (cobertura && cobertura.cubierta ? 'checked' : '')}>
+        Cubierto por el seguro
+      </label>
+      <label>Periodicidad (meses) — para calcular el próximo recordatorio
+        <input type="number" min="0" name="periodicidad_meses" value="${editing ? editing.periodicidad_meses || '' : ''}">
+      </label>
+      <label>Próxima fecha (se calcula sola si pones periodicidad, pero puedes ajustarla)
+        <input type="date" name="proxima_fecha" value="${editing ? editing.proxima_fecha || '' : ''}">
+      </label>
+      <label>Notas
+        <textarea name="notas">${editing ? editing.notas || '' : ''}</textarea>
+      </label>
+      <div class="form-actions">
+        <a href="#/tratamientos" class="btn">Cancelar</a>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
+  `;
+  $app.innerHTML = layout(editing ? 'Editar tratamiento' : 'Nuevo tratamiento', content);
+
+  const form = document.getElementById('tratamiento-form');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(form);
+    const categoriaId = fd.get('categoria_id');
+    const cub = coberturaByCategoria(categoriaId);
+    const cubiertoSeguro = fd.get('cubierto_seguro') === 'on';
+    const coste = Number(fd.get('coste'));
+    const porcentaje = cubiertoSeguro
+      ? Number((cub && cub.porcentaje_especifico) || (state.seguro && state.seguro.porcentaje_reembolso_general) || 0)
+      : 0;
+
+    let proximaFecha = fd.get('proxima_fecha');
+    const periodicidad = fd.get('periodicidad_meses');
+    if (!proximaFecha && periodicidad) proximaFecha = addMonths(fd.get('fecha'), periodicidad);
+
+    const data = {
+      id: editing ? editing.id : undefined,
+      fecha: fd.get('fecha'),
+      categoria_id: categoriaId,
+      descripcion: fd.get('descripcion'),
+      coste,
+      cubierto_seguro: cubiertoSeguro,
+      porcentaje_aplicado: porcentaje,
+      importe_reembolsado: Math.round(coste * porcentaje) / 100,
+      periodicidad_meses: periodicidad,
+      proxima_fecha: proximaFecha,
+      notas: fd.get('notas')
+    };
+
+    const res = editing ? await Api.updateTratamiento(data) : await Api.createTratamiento(data);
+    if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+    state.loaded = false;
+    location.hash = '#/tratamientos';
+    await loadData();
+    route();
+  });
+}
+
+async function onDeleteTratamiento(id) {
+  if (!confirm('¿Borrar este tratamiento? No se puede deshacer.')) return;
+  await Api.deleteTratamiento(id);
+  state.loaded = false;
+  await loadData();
+  route();
+}
+
+// ---------- Seguro ----------
+
+function renderSeguro() {
+  const s = state.seguro || {};
+  const content = `
+    <form id="seguro-form" class="form">
+      <label>Compañía
+        <input type="text" name="compania" value="${s.compania || ''}" required>
+      </label>
+      <label>Nº de póliza
+        <input type="text" name="poliza" value="${s.poliza || ''}">
+      </label>
+      <label>% de reembolso general
+        <input type="number" min="0" max="100" name="porcentaje_reembolso_general" value="${s.porcentaje_reembolso_general || 0}" required>
+      </label>
+      <label>Fecha de inicio
+        <input type="date" name="fecha_inicio" value="${s.fecha_inicio || ''}">
+      </label>
+      <label>Fecha de renovación
+        <input type="date" name="fecha_renovacion" value="${s.fecha_renovacion || ''}">
+      </label>
+      <label>Notas
+        <textarea name="notas">${s.notas || ''}</textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Guardar póliza</button>
+      </div>
+    </form>
+
+    <section class="panel">
+      <h2>Cobertura por categoría</h2>
+      <p class="muted">Marca qué categorías cubre el seguro. Si dejas el % específico vacío, se usa el % general de la póliza.</p>
+      <table class="table">
+        <thead><tr><th>Categoría</th><th>Cubierta</th><th>% específico (opcional)</th><th></th></tr></thead>
+        <tbody id="coberturas-body">
+          ${state.categorias.map(c => {
+            const cob = coberturaByCategoria(c.id) || {};
+            return `
+              <tr data-categoria="${c.id}">
+                <td><span class="tag" style="background:${c.color}22;color:${c.color}">${c.nombre}</span></td>
+                <td><input type="checkbox" class="cob-cubierta" ${cob.cubierta ? 'checked' : ''}></td>
+                <td><input type="number" min="0" max="100" class="cob-porcentaje" placeholder="general" value="${cob.porcentaje_especifico || ''}"></td>
+                <td><button class="btn small" onclick="onSaveCobertura('${c.id}')" type="button">Guardar</button></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </section>
+  `;
+  $app.innerHTML = layout('Seguro', content);
+
+  document.getElementById('seguro-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    const data = { id: s.id, ...Object.fromEntries(fd.entries()) };
+    const res = await Api.upsertSeguro(data);
+    if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+    state.loaded = false;
+    await loadData();
+    route();
+  });
+}
+
+async function onSaveCobertura(categoriaId) {
+  const row = document.querySelector(`tr[data-categoria="${categoriaId}"]`);
+  const cubierta = row.querySelector('.cob-cubierta').checked;
+  const porcentaje = row.querySelector('.cob-porcentaje').value;
+  const res = await Api.upsertCobertura({ categoria_id: categoriaId, cubierta, porcentaje_especifico: porcentaje });
+  if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+  state.loaded = false;
+  await loadData();
+  route();
+}
+
+// ---------- Ajustes ----------
+
+function renderAjustes() {
+  const content = `
+    <section class="panel">
+      <h2>Usuarios con acceso</h2>
+      <ul>
+        ${state.usuarios.map(u => `<li>${u.nombre} — ${u.email}</li>`).join('')}
+      </ul>
+      <p class="muted">Para añadir o quitar acceso, edita la pestaña "Usuarios" de la Google Sheet.</p>
+    </section>
+    <section class="panel">
+      <h2>Notificaciones push</h2>
+      <p class="muted">Actívalas para recibir avisos en el móvil además del email.</p>
+      <button class="btn primary" id="enable-push">Activar notificaciones push</button>
+      <p id="push-status" class="muted"></p>
+    </section>
+    <section class="panel">
+      <button class="btn" onclick="logout()">Cerrar sesión</button>
+    </section>
+  `;
+  $app.innerHTML = layout('Ajustes', content);
+  document.getElementById('enable-push').addEventListener('click', enablePush);
+}

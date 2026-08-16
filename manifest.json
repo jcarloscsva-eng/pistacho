@@ -1,0 +1,19 @@
+{
+  "name": "Pistacho · Salud y Seguro",
+  "short_name": "Pistacho",
+  "description": "Gestión médica y de seguro de Pistacho",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#2e7d5e",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
