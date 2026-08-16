@@ -9,6 +9,36 @@ const state = {
 
 const calendarState = { year: new Date().getFullYear(), month: new Date().getMonth() }; // month: 0-11
 
+// Cuadro de referencia orientativo — no lee de la Sheet, es solo consulta.
+// Periodicidades generales para perro adulto; siempre prevalece la indicación del veterinario.
+const CUADRO_MAESTRO = [
+  {
+    grupo: 'Vacunas',
+    items: [
+      { nombre: 'Polivalente (moquillo, hepatitis, parvovirus, parainfluenza)', periodicidad: 'Anual', notas: 'Tras la pauta inicial de cachorro (2-3 dosis). Revacunación anual de por vida.' },
+      { nombre: 'Rabia', periodicidad: 'Anual', notas: 'Obligatoria en Castilla y León. Se suele poner junto con la polivalente.' },
+      { nombre: 'Leishmaniosis (vacuna)', periodicidad: 'Anual', notas: 'Pauta inicial de 3 dosis. Alternativa o complemento: collar/pipeta repelente de flebotomos.' }
+    ]
+  },
+  {
+    grupo: 'Desparasitación',
+    items: [
+      { nombre: 'Desparasitación interna (pastilla/pasta)', periodicidad: 'Cada 3 meses', notas: 'Cada 1 mes en cachorros y si hay riesgo alto (parques, otros perros).' },
+      { nombre: 'Desparasitación externa — pipeta', periodicidad: 'Mensual', notas: 'Protege frente a pulgas, garrapatas y flebotomos (leishmaniosis).' },
+      { nombre: 'Desparasitación externa — collar', periodicidad: 'Cada 6-8 meses', notas: 'Alternativa a la pipeta, no combinar ambos sin indicación veterinaria.' }
+    ]
+  },
+  {
+    grupo: 'Revisiones',
+    items: [
+      { nombre: 'Revisión general / chequeo', periodicidad: 'Anual', notas: 'Suele coincidir con la vacunación anual.' },
+      { nombre: 'Analítica de sangre', periodicidad: 'Anual', notas: 'Recomendable con más frecuencia a partir de los 7-8 años.' },
+      { nombre: 'Test leishmaniosis/filaria', periodicidad: 'Anual', notas: 'Antes de revacunar frente a leishmaniosis.' },
+      { nombre: 'Limpieza dental', periodicidad: 'Según sarro', notas: 'El veterinario lo valora en cada revisión, no tiene periodicidad fija.' }
+    ]
+  }
+];
+
 const $app = document.getElementById('app');
 
 // ---------- Utilidades ----------
@@ -75,6 +105,7 @@ function route() {
   else if (hash.startsWith('#/tratamientos/editar/')) renderTratamientoForm(hash.split('/').pop());
   else if (hash.startsWith('#/tratamientos')) renderTratamientos();
   else if (hash.startsWith('#/calendario')) renderCalendario();
+  else if (hash.startsWith('#/guia')) renderGuia();
   else if (hash.startsWith('#/seguro')) renderSeguro();
   else if (hash.startsWith('#/ajustes')) renderAjustes();
   else renderDashboard();
@@ -108,6 +139,7 @@ function layout(title, content) {
           <a href="#/dashboard" class="${navActive('dashboard')}">Resumen</a>
           <a href="#/tratamientos" class="${navActive('tratamientos')}">Tratamientos</a>
           <a href="#/calendario" class="${navActive('calendario')}">Calendario</a>
+          <a href="#/guia" class="${navActive('guia')}">Guía</a>
           <a href="#/seguro" class="${navActive('seguro')}">Seguro</a>
           <a href="#/ajustes" class="${navActive('ajustes')}">Ajustes</a>
         </nav>
@@ -431,6 +463,32 @@ function renderCalendario() {
     <p class="muted" style="margin-top:14px;">Cada bloque de color es un tratamiento con recordatorio para ese día. Para cambiar la fecha, edítalo desde la pestaña Tratamientos.</p>
   `;
   $app.innerHTML = layout('Calendario', content);
+}
+
+// ---------- Guía ----------
+
+function renderGuia() {
+  const content = `
+    <p class="muted">Cuadro orientativo de periodicidad de tratamientos habituales en perros adultos. Es solo una referencia: la pauta real siempre la marca el veterinario.</p>
+    ${CUADRO_MAESTRO.map(grupo => `
+      <section class="panel">
+        <h2>${grupo.grupo}</h2>
+        <table class="table">
+          <thead><tr><th>Tratamiento</th><th>Periodicidad</th><th>Notas</th></tr></thead>
+          <tbody>
+            ${grupo.items.map(item => `
+              <tr>
+                <td>${item.nombre}</td>
+                <td>${item.periodicidad}</td>
+                <td class="muted">${item.notas}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </section>
+    `).join('')}
+  `;
+  $app.innerHTML = layout('Guía', content);
 }
 
 // ---------- Seguro ----------
