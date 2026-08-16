@@ -135,6 +135,10 @@ function layout(title, content) {
     <div class="shell">
       <header class="topbar">
         <div class="brand">🐾 Pistacho</div>
+        <input type="checkbox" id="nav-toggle" class="nav-toggle">
+        <label for="nav-toggle" class="hamburger" aria-label="Abrir menú">
+          <span></span><span></span><span></span>
+        </label>
         <nav class="tabs">
           <a href="#/dashboard" class="${navActive('dashboard')}">Resumen</a>
           <a href="#/tratamientos" class="${navActive('tratamientos')}">Tratamientos</a>
@@ -142,8 +146,8 @@ function layout(title, content) {
           <a href="#/guia" class="${navActive('guia')}">Guía</a>
           <a href="#/seguro" class="${navActive('seguro')}">Seguro</a>
           <a href="#/ajustes" class="${navActive('ajustes')}">Ajustes</a>
+          <div class="user-chip" title="${s.email}">${s.nombre || s.email}</div>
         </nav>
-        <div class="user-chip" title="${s.email}">${s.nombre || s.email}</div>
       </header>
       <main class="content">
         <h1>${title}</h1>
