@@ -7,11 +7,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyCTD5NQ-A_g9DIP4T6NQoYLoy9nB6OgN_k',
+  authDomain: 'pistacho-4e804.firebaseapp.com',
+  projectId: 'pistacho-4e804',
+  storageBucket: 'pistacho-4e804.firebasestorage.app',
+  messagingSenderId: '697796550736',
+  appId: '1:697796550736:web:84ef745c55a9fd4c6fb155'
 });
 
 const messaging = firebase.messaging();
