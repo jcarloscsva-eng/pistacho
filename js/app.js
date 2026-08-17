@@ -69,20 +69,87 @@ function categoriaById(id) {
 function coberturaByCategoria(id) {
   return state.coberturas.find(c => c.categoria_id === id);
 }
-function showToast(msg) {
+function showToast(msg, variant) {
   let el = document.getElementById('toast');
   if (!el) {
     el = document.createElement('div');
     el.id = 'toast';
     el.className = 'toast';
+    el.setAttribute('role', 'status');
     document.body.appendChild(el);
   }
   el.textContent = msg;
-  el.classList.remove('show');
+  el.classList.remove('show', 'error');
+  el.setAttribute('aria-live', variant === 'error' ? 'assertive' : 'polite');
+  if (variant === 'error') el.classList.add('error');
   void el.offsetWidth; // reinicia la animación si se pulsa varias veces seguidas
   el.classList.add('show');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+  el._timer = setTimeout(() => el.classList.remove('show'), variant === 'error' ? 4000 : 2500);
+}
+
+// Colores de categoría: vienen de la Sheet sin garantía de contraste.
+// Se usan tal cual para acentos (borde, punto, fondo tenue) pero el texto
+// siempre se oscurece lo justo para pasar 4.5:1 sobre blanco.
+function hexToRgb(hex) {
+  const clean = (hex || '').replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  const num = parseInt(full, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0; const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return [h, s, l];
+}
+function hslToRgb(h, s, l) {
+  if (s === 0) { const v = l * 255; return [v, v, v]; }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [hue2rgb(p, q, h + 1 / 3) * 255, hue2rgb(p, q, h) * 255, hue2rgb(p, q, h - 1 / 3) * 255];
+}
+function relativeLuminance({ r, g, b }) {
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+function contrastRatio(hexA, hexB) {
+  const lA = relativeLuminance(hexToRgb(hexA));
+  const lB = relativeLuminance(hexToRgb(hexB));
+  const [light, dark] = lA > lB ? [lA, lB] : [lB, lA];
+  return (light + 0.05) / (dark + 0.05);
+}
+function readableCategoryColor(hex) {
+  if (!/^#?[0-9a-f]{3,6}$/i.test(hex || '')) return '#3a3a3a';
+  const normalized = hex.startsWith('#') ? hex : `#${hex}`;
+  if (contrastRatio(normalized, '#ffffff') >= 4.5) return normalized;
+  const { r, g, b } = hexToRgb(normalized);
+  const [h, s, startL] = rgbToHsl(r, g, b);
+  for (let l = startL; l >= 0; l -= 0.04) {
+    const [rr, gg, bb] = hslToRgb(h, s, l);
+    const candidate = rgbToHex(rr, gg, bb);
+    if (contrastRatio(candidate, '#ffffff') >= 4.5) return candidate;
+  }
+  return '#2a2a2a';
 }
 
 // ---------- Router ----------
@@ -188,7 +255,7 @@ function initGoogleSignIn() {
   });
   google.accounts.id.renderButton(
     document.getElementById('g_id_signin'),
-    { theme: 'filled_black', size: 'large', text: 'signin_with', shape: 'pill' }
+    { theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill' }
   );
 }
 
@@ -246,7 +313,7 @@ function renderDashboard() {
         <ul class="reminder-list">
           ${proximos.map(t => `
             <li class="${t.dias < 0 ? 'overdue' : t.dias <= 7 ? 'soon' : ''}">
-              <span class="dot" style="background:${categoriaById(t.categoria_id).color}"></span>
+              <span class="dot" style="background:${categoriaById(t.categoria_id).color}" aria-hidden="true"></span>
               <div class="reminder-body">
                 <strong>${categoriaById(t.categoria_id).nombre}</strong> — ${t.descripcion || ''}
                 <div class="muted">${fmtDate(t.proxima_fecha)} · ${t.dias < 0 ? `${Math.abs(t.dias)} días de retraso` : t.dias === 0 ? 'hoy' : `en ${t.dias} días`}</div>
@@ -296,9 +363,9 @@ function renderTratamientos() {
         </thead>
         <tbody>
           ${rows.map(t => `
-            <tr class="tr-main" onclick="openTratamientoSheet('${t.id}')">
+            <tr class="tr-main" tabindex="0" onclick="openTratamientoSheet('${t.id}')" onkeydown="if(event.key==='Enter'){openTratamientoSheet('${t.id}')}">
               <td>${fmtDate(t.fecha)}</td>
-              <td><span class="tag" style="color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
+              <td><span class="tag" style="color:${readableCategoryColor(categoriaById(t.categoria_id).color)};--tag-accent:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
               <td>${t.descripcion || ''}</td>
               <td>${fmtEUR(t.coste)}</td>
               <td class="col-extra">${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
@@ -320,15 +387,19 @@ function renderTratamientos() {
   $app.innerHTML = layout('Tratamientos', content);
 }
 
+let sheetTriggerEl = null;
+
 function openTratamientoSheet(id) {
   const t = state.tratamientos.find(x => x.id === id);
   if (!t) return;
+  sheetTriggerEl = document.activeElement;
   const cat = categoriaById(t.categoria_id);
-  document.getElementById('tr-sheet').innerHTML = `
+  const sheet = document.getElementById('tr-sheet');
+  sheet.innerHTML = `
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <span class="tag" style="color:${cat.color}">${cat.nombre}</span>
-      <strong>${t.descripcion || ''}</strong>
+      <span class="tag" style="color:${readableCategoryColor(cat.color)};--tag-accent:${cat.color}">${cat.nombre}</span>
+      <strong id="tr-sheet-title">${t.descripcion || ''}</strong>
     </div>
     <div class="detail-grid">
       <div><span class="detail-label">Fecha</span>${fmtDate(t.fecha)}</div>
@@ -342,14 +413,31 @@ function openTratamientoSheet(id) {
       <button type="button" class="btn danger" onclick="closeTratamientoSheet();onDeleteTratamiento('${t.id}')">Borrar</button>
     </div>
   `;
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', 'tr-sheet-title');
+  sheet.setAttribute('tabindex', '-1');
   const backdrop = document.getElementById('tr-sheet-backdrop');
-  const sheet = document.getElementById('tr-sheet');
   backdrop.hidden = false;
   sheet.hidden = false;
   requestAnimationFrame(() => {
     backdrop.classList.add('show');
     sheet.classList.add('show');
+    sheet.focus();
   });
+  document.addEventListener('keydown', onSheetKeydown);
+}
+
+function onSheetKeydown(ev) {
+  const sheet = document.getElementById('tr-sheet');
+  if (ev.key === 'Escape') { closeTratamientoSheet(); return; }
+  if (ev.key !== 'Tab') return;
+  const focusables = sheet.querySelectorAll('a[href], button:not([disabled])');
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+  else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
 }
 
 function closeTratamientoSheet() {
@@ -358,7 +446,10 @@ function closeTratamientoSheet() {
   if (!backdrop || !sheet) return;
   backdrop.classList.remove('show');
   sheet.classList.remove('show');
+  document.removeEventListener('keydown', onSheetKeydown);
   setTimeout(() => { backdrop.hidden = true; sheet.hidden = true; }, 200);
+  if (sheetTriggerEl && typeof sheetTriggerEl.focus === 'function') sheetTriggerEl.focus();
+  sheetTriggerEl = null;
 }
 
 function renderTratamientoForm(id) {
@@ -433,7 +524,7 @@ function renderTratamientoForm(id) {
     };
 
     const res = editing ? await Api.updateTratamiento(data) : await Api.createTratamiento(data);
-    if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+    if (res.error) { showToast('No se ha podido guardar: ' + res.error, 'error'); return; }
     state.loaded = false;
     location.hash = '#/tratamientos';
     await loadData();
@@ -445,7 +536,7 @@ function renderTratamientoForm(id) {
 async function onDeleteTratamiento(id) {
   if (!confirm('¿Borrar este tratamiento? No se puede deshacer.')) return;
   const res = await Api.deleteTratamiento(id);
-  if (res.error) { alert('No se ha podido borrar: ' + res.error); return; }
+  if (res.error) { showToast('No se ha podido borrar: ' + res.error, 'error'); return; }
   state.loaded = false;
   await loadData();
   route();
@@ -494,7 +585,7 @@ function renderCalendario() {
       <div class="cal-cell ${isToday ? 'today' : ''} ${eventos.length ? 'has-events' : ''}">
         <div class="cal-daynum">${d}</div>
         ${eventos.map(t => `
-          <div class="cal-event" style="background:${categoriaById(t.categoria_id).color}22;color:${categoriaById(t.categoria_id).color}" title="${categoriaById(t.categoria_id).nombre} — ${t.descripcion || ''}">
+          <div class="cal-event" style="background:${categoriaById(t.categoria_id).color}22;color:${readableCategoryColor(categoriaById(t.categoria_id).color)}" title="${categoriaById(t.categoria_id).nombre} — ${t.descripcion || ''}">
             ${categoriaById(t.categoria_id).nombre}
           </div>
         `).join('')}
@@ -584,7 +675,7 @@ function renderSeguro() {
             const cob = coberturaByCategoria(c.id) || {};
             return `
               <tr data-categoria="${c.id}">
-                <td><span class="tag" style="color:${c.color}">${c.nombre}</span></td>
+                <td><span class="tag" style="color:${readableCategoryColor(c.color)};--tag-accent:${c.color}">${c.nombre}</span></td>
                 <td><input type="checkbox" class="cob-cubierta" ${cob.cubierta ? 'checked' : ''}></td>
                 <td><input type="number" min="0" max="100" class="cob-porcentaje" placeholder="general" value="${cob.porcentaje_especifico || ''}"></td>
                 <td><button class="btn small" onclick="onSaveCobertura('${c.id}')" type="button">Guardar</button></td>
@@ -602,7 +693,7 @@ function renderSeguro() {
     const fd = new FormData(ev.target);
     const data = { id: s.id, ...Object.fromEntries(fd.entries()) };
     const res = await Api.upsertSeguro(data);
-    if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+    if (res.error) { showToast('No se ha podido guardar: ' + res.error, 'error'); return; }
     state.loaded = false;
     await loadData();
     route();
@@ -615,7 +706,7 @@ async function onSaveCobertura(categoriaId) {
   const cubierta = row.querySelector('.cob-cubierta').checked;
   const porcentaje = row.querySelector('.cob-porcentaje').value;
   const res = await Api.upsertCobertura({ categoria_id: categoriaId, cubierta, porcentaje_especifico: porcentaje });
-  if (res.error) { alert('No se ha podido guardar: ' + res.error); return; }
+  if (res.error) { showToast('No se ha podido guardar: ' + res.error, 'error'); return; }
   state.loaded = false;
   await loadData();
   route();
