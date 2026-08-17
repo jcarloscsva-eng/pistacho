@@ -7,7 +7,9 @@ const state = {
   loaded: false
 };
 
-const calendarState = { year: new Date().getFullYear(), month: new Date().getMonth() }; // month: 0-11
+// view: 'mes' (por defecto) o 'semana'. ref: fecha ancla (YYYY-MM-DD) de la que se derivan
+// el mes o la semana mostrados.
+const calendarState = { view: 'mes', ref: new Date().toISOString().slice(0, 10) };
 
 // Cuadro de referencia orientativo — no lee de la Sheet, es solo consulta.
 // Periodicidades generales para perro adulto; siempre prevalece la indicación del veterinario.
@@ -545,35 +547,81 @@ async function onDeleteTratamiento(id) {
 
 // ---------- Calendario ----------
 
-function shiftCalendar(delta) {
-  let m = calendarState.month + delta;
-  let y = calendarState.year;
-  if (m < 0) { m = 11; y--; }
-  if (m > 11) { m = 0; y++; }
-  calendarState.month = m;
-  calendarState.year = y;
-  renderCalendario();
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const MESES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const DIAS_CORTO = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const DIAS_LARGO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+function addDays(dateStr, days) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
-
-function renderCalendario() {
-  const { year, month } = calendarState;
-  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-  const firstOfMonth = new Date(year, month, 1);
-  // getDay(): 0=domingo..6=sábado; lo convertimos a que la semana empiece en lunes
-  const startOffset = (firstOfMonth.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  // Agrupa tratamientos con próxima fecha por día (YYYY-MM-DD)
+function startOfWeekMonday(dateStr) {
+  const d = new Date(dateStr);
+  const offset = (d.getDay() + 6) % 7; // getDay(): 0=domingo..6=sábado -> semana empieza en lunes
+  d.setDate(d.getDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+function eventosPorDia() {
   const porDia = {};
   state.tratamientos.forEach(t => {
     if (!t.proxima_fecha) return;
     porDia[t.proxima_fecha] = porDia[t.proxima_fecha] || [];
     porDia[t.proxima_fecha].push(t);
   });
+  return porDia;
+}
+function fmtRangoSemana(startStr, endStr) {
+  const start = new Date(startStr), end = new Date(endStr);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) return `${start.getDate()}–${end.getDate()} ${MESES_CORTO[start.getMonth()]} ${start.getFullYear()}`;
+  const sameYear = start.getFullYear() === end.getFullYear();
+  return `${start.getDate()} ${MESES_CORTO[start.getMonth()]}${sameYear ? '' : ' ' + start.getFullYear()} – ${end.getDate()} ${MESES_CORTO[end.getMonth()]} ${end.getFullYear()}`;
+}
+
+function setCalendarView(view) {
+  if (calendarState.view === view) return;
+  calendarState.view = view;
+  renderCalendario();
+}
+
+function shiftCalendar(delta) {
+  if (calendarState.view === 'semana') {
+    calendarState.ref = addDays(calendarState.ref, delta * 7);
+  } else {
+    const d = new Date(calendarState.ref);
+    d.setDate(1); // evita desbordes de fin de mes (p.ej. 31 ene + 1 mes)
+    d.setMonth(d.getMonth() + delta);
+    calendarState.ref = d.toISOString().slice(0, 10);
+  }
+  renderCalendario();
+}
+
+function calendarViewToggle() {
+  return `
+    <div class="cal-view-toggle" role="group" aria-label="Vista del calendario">
+      <button type="button" class="btn small ${calendarState.view === 'mes' ? 'active' : ''}" aria-pressed="${calendarState.view === 'mes'}" onclick="setCalendarView('mes')">Mes</button>
+      <button type="button" class="btn small ${calendarState.view === 'semana' ? 'active' : ''}" aria-pressed="${calendarState.view === 'semana'}" onclick="setCalendarView('semana')">Semana</button>
+    </div>
+  `;
+}
+
+function renderCalendario() {
+  const content = calendarState.view === 'semana' ? renderCalendarioSemana() : renderCalendarioMes();
+  $app.innerHTML = layout('Calendario', content);
+}
+
+function renderCalendarioMes() {
+  const ref = new Date(calendarState.ref);
+  const year = ref.getFullYear();
+  const month = ref.getMonth();
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const porDia = eventosPorDia();
 
   const cells = [];
   for (let i = 0; i < startOffset; i++) cells.push('<div class="cal-cell empty"></div>');
@@ -593,21 +641,66 @@ function renderCalendario() {
     `);
   }
 
-  const content = `
+  return `
     <div class="cal-header">
-      <button class="btn" onclick="shiftCalendar(-1)">‹ Anterior</button>
+      <button class="btn" onclick="shiftCalendar(-1)" aria-label="Mes anterior">‹ Anterior</button>
       <div class="cal-title">${MESES[month]} ${year}</div>
-      <button class="btn" onclick="shiftCalendar(1)">Siguiente ›</button>
+      <button class="btn" onclick="shiftCalendar(1)" aria-label="Mes siguiente">Siguiente ›</button>
     </div>
+    ${calendarViewToggle()}
     <div class="cal-grid cal-grid-labels">
-      ${DIAS.map(d => `<div class="cal-daylabel">${d}</div>`).join('')}
+      ${DIAS_CORTO.map(d => `<div class="cal-daylabel">${d}</div>`).join('')}
     </div>
     <div class="cal-grid">
       ${cells.join('')}
     </div>
     <p class="muted" style="margin-top:14px;">Cada bloque de color es un tratamiento con recordatorio para ese día. Para cambiar la fecha, edítalo desde la pestaña Tratamientos.</p>
   `;
-  $app.innerHTML = layout('Calendario', content);
+}
+
+function renderCalendarioSemana() {
+  const start = startOfWeekMonday(calendarState.ref);
+  const end = addDays(start, 6);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const porDia = eventosPorDia();
+
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const dateStr = addDays(start, i);
+    const d = new Date(dateStr);
+    const eventos = porDia[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    dias.push(`
+      <div class="cal-week-day ${isToday ? 'today' : ''}">
+        <div class="cal-week-daylabel">${DIAS_LARGO[i]} <span class="muted">${d.getDate()} ${MESES_CORTO[d.getMonth()]}</span></div>
+        ${eventos.length === 0 ? '<p class="muted">Sin tratamientos previstos.</p>' : `
+          <ul class="reminder-list">
+            ${eventos.map(t => `
+              <li>
+                <span class="dot" style="background:${categoriaById(t.categoria_id).color}" aria-hidden="true"></span>
+                <div class="reminder-body">
+                  <span class="tag" style="color:${readableCategoryColor(categoriaById(t.categoria_id).color)};--tag-accent:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span>
+                  ${t.descripcion || ''}
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        `}
+      </div>
+    `);
+  }
+
+  return `
+    <div class="cal-header">
+      <button class="btn" onclick="shiftCalendar(-1)" aria-label="Semana anterior">‹ Anterior</button>
+      <div class="cal-title">${fmtRangoSemana(start, end)}</div>
+      <button class="btn" onclick="shiftCalendar(1)" aria-label="Semana siguiente">Siguiente ›</button>
+    </div>
+    ${calendarViewToggle()}
+    <div class="cal-week">
+      ${dias.join('')}
+    </div>
+  `;
 }
 
 // ---------- Guía ----------

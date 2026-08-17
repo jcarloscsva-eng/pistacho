@@ -236,6 +236,8 @@ a { color: var(--primary-dark); }
 
 .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .cal-title { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.cal-view-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+.btn.small.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .cal-grid-labels { margin-bottom: 6px; }
 .cal-daylabel { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
@@ -262,6 +264,12 @@ a { color: var(--primary-dark); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.cal-week { display: flex; flex-direction: column; gap: 10px; }
+.cal-week-day { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.cal-week-day.today { border-color: var(--primary); border-width: 2px; }
+.cal-week-daylabel { font-weight: 700; margin-bottom: 10px; display: flex; gap: 8px; align-items: baseline; }
+.cal-week-day .reminder-list { gap: 8px; }
 
 @media (max-width: 640px) {
   .topbar {
