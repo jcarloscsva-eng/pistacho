@@ -1,4 +1,4 @@
-const CACHE = 'pistacho-v5';
+const CACHE = 'pistacho-v8';
 const CORE_ASSETS = [
   '/',
   '/index.html',
