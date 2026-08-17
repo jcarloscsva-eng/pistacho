@@ -285,33 +285,35 @@ function renderTratamientos() {
     <div class="toolbar">
       <a href="#/tratamientos/nuevo" class="btn primary">+ Nuevo tratamiento</a>
     </div>
-    <table class="table table-tratamientos">
-      <thead>
-        <tr>
-          <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Coste</th>
-          <th class="col-extra">Seguro</th><th class="col-extra">Reembolsado</th><th class="col-extra">Próxima vez</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.map(t => `
-          <tr class="tr-main" onclick="openTratamientoSheet('${t.id}')">
-            <td>${fmtDate(t.fecha)}</td>
-            <td><span class="tag" style="color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
-            <td>${t.descripcion || ''}</td>
-            <td>${fmtEUR(t.coste)}</td>
-            <td class="col-extra">${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
-            <td class="col-extra">${fmtEUR(t.importe_reembolsado)}</td>
-            <td class="col-extra">${fmtDate(t.proxima_fecha)}</td>
-            <td class="row-actions">
-              <a href="#/tratamientos/editar/${t.id}" onclick="event.stopPropagation()">Editar</a>
-              <a href="#" onclick="event.stopPropagation();onDeleteTratamiento('${t.id}');return false;">Borrar</a>
-              <span class="chevron" aria-hidden="true">›</span>
-            </td>
+    <div class="table-scroll">
+      <table class="table table-tratamientos">
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Coste</th>
+            <th class="col-extra">Seguro</th><th class="col-extra">Reembolsado</th><th class="col-extra">Próxima vez</th>
+            <th></th>
           </tr>
-        `).join('') || `<tr><td colspan="8" class="muted">Todavía no hay tratamientos.</td></tr>`}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${rows.map(t => `
+            <tr class="tr-main" onclick="openTratamientoSheet('${t.id}')">
+              <td>${fmtDate(t.fecha)}</td>
+              <td><span class="tag" style="color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
+              <td>${t.descripcion || ''}</td>
+              <td>${fmtEUR(t.coste)}</td>
+              <td class="col-extra">${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
+              <td class="col-extra">${fmtEUR(t.importe_reembolsado)}</td>
+              <td class="col-extra">${fmtDate(t.proxima_fecha)}</td>
+              <td class="row-actions">
+                <a href="#/tratamientos/editar/${t.id}" onclick="event.stopPropagation()">Editar</a>
+                <a href="#" onclick="event.stopPropagation();onDeleteTratamiento('${t.id}');return false;">Borrar</a>
+                <span class="chevron" aria-hidden="true">›</span>
+              </td>
+            </tr>
+          `).join('') || `<tr><td colspan="8" class="muted">Todavía no hay tratamientos.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
     <div id="tr-sheet-backdrop" class="sheet-backdrop" onclick="closeTratamientoSheet()" hidden></div>
     <div id="tr-sheet" class="sheet" hidden></div>
   `;
