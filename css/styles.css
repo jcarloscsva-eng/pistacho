@@ -234,6 +234,7 @@ a { color: var(--primary-dark); }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .toast.error { background: var(--danger); }
+.toast.warn { background: var(--warn); color: #3a2b04; }
 
 .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .cal-title { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
