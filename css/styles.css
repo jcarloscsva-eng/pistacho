@@ -320,7 +320,7 @@ a { color: var(--primary-dark); }
     font-size: 18px;
   }
   .table-tratamientos .tag { font-size: 10px; padding: 2px 8px; }
-
+  .table-tratamientos td:nth-child(3) { max-width: 38vw; }
   .sheet-actions { flex-direction: column-reverse; }
 }
 
