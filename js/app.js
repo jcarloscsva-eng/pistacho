@@ -589,6 +589,11 @@ function setCalendarView(view) {
 function shiftCalendar(delta) {
   if (calendarState.view === 'semana') {
     calendarState.ref = addDays(calendarState.ref, delta * 7);
+  } else if (calendarState.view === 'año') {
+    const d = new Date(calendarState.ref);
+    d.setDate(1);
+    d.setFullYear(d.getFullYear() + delta);
+    calendarState.ref = d.toISOString().slice(0, 10);
   } else {
     const d = new Date(calendarState.ref);
     d.setDate(1); // evita desbordes de fin de mes (p.ej. 31 ene + 1 mes)
@@ -598,18 +603,73 @@ function shiftCalendar(delta) {
   renderCalendario();
 }
 
+function goToMonthView(year, month) {
+  calendarState.view = 'mes';
+  calendarState.ref = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  renderCalendario();
+}
+
 function calendarViewToggle() {
   return `
     <div class="cal-view-toggle" role="group" aria-label="Vista del calendario">
       <button type="button" class="btn small ${calendarState.view === 'mes' ? 'active' : ''}" aria-pressed="${calendarState.view === 'mes'}" onclick="setCalendarView('mes')">Mes</button>
       <button type="button" class="btn small ${calendarState.view === 'semana' ? 'active' : ''}" aria-pressed="${calendarState.view === 'semana'}" onclick="setCalendarView('semana')">Semana</button>
+      <button type="button" class="btn small ${calendarState.view === 'año' ? 'active' : ''}" aria-pressed="${calendarState.view === 'año'}" onclick="setCalendarView('año')">Año</button>
     </div>
   `;
 }
 
 function renderCalendario() {
-  const content = calendarState.view === 'semana' ? renderCalendarioSemana() : renderCalendarioMes();
+  const content = calendarState.view === 'semana' ? renderCalendarioSemana()
+    : calendarState.view === 'año' ? renderCalendarioAnio()
+    : renderCalendarioMes();
   $app.innerHTML = layout('Calendario', content);
+}
+
+function renderCalendarioAnio() {
+  const year = new Date(calendarState.ref).getFullYear();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const porDia = eventosPorDia();
+
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    const firstOfMonth = new Date(year, m, 1);
+    const startOffset = (firstOfMonth.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+    const monthPrefix = `${year}-${String(m + 1).padStart(2, '0')}`;
+
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) cells.push('<div class="cal-year-day empty"></div>');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const hasEvents = !!(porDia[dateStr] && porDia[dateStr].length);
+      cells.push(`<div class="cal-year-day ${isToday ? 'today' : ''} ${hasEvents ? 'has-events' : ''}">${d}</div>`);
+    }
+
+    const diasConEventos = Object.keys(porDia).filter(k => k.startsWith(monthPrefix)).length;
+
+    months.push(`
+      <div class="cal-year-month" tabindex="0" role="button" aria-label="Ir a ${MESES[m]} ${year}"
+           onclick="goToMonthView(${year},${m})" onkeydown="if(event.key==='Enter'){goToMonthView(${year},${m})}">
+        <h4>${MESES[m]}${diasConEventos ? `<span class="cal-year-count">${diasConEventos}</span>` : ''}</h4>
+        <div class="cal-year-grid">${cells.join('')}</div>
+      </div>
+    `);
+  }
+
+  return `
+    <div class="cal-header">
+      <button class="btn" onclick="shiftCalendar(-1)" aria-label="Año anterior">‹ Anterior</button>
+      <div class="cal-title">${year}</div>
+      <button class="btn" onclick="shiftCalendar(1)" aria-label="Año siguiente">Siguiente ›</button>
+    </div>
+    ${calendarViewToggle()}
+    <div class="cal-year">
+      ${months.join('')}
+    </div>
+    <p class="muted" style="margin-top:14px;">Toca un mes para ver el detalle de sus tratamientos. El número junto al nombre es la cantidad de días con algo previsto.</p>
+  `;
 }
 
 function renderCalendarioMes() {
