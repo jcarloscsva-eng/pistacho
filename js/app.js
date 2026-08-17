@@ -81,13 +81,13 @@ function showToast(msg, variant) {
     document.body.appendChild(el);
   }
   el.textContent = msg;
-  el.classList.remove('show', 'error');
+  el.classList.remove('show', 'error', 'warn');
   el.setAttribute('aria-live', variant === 'error' ? 'assertive' : 'polite');
-  if (variant === 'error') el.classList.add('error');
+  if (variant === 'error' || variant === 'warn') el.classList.add(variant);
   void el.offsetWidth; // reinicia la animación si se pulsa varias veces seguidas
   el.classList.add('show');
   clearTimeout(el._timer);
-  el._timer = setTimeout(() => el.classList.remove('show'), variant === 'error' ? 4000 : 2500);
+  el._timer = setTimeout(() => el.classList.remove('show'), variant === 'error' ? 4000 : variant === 'warn' ? 3800 : 2500);
 }
 
 // Colores de categoría: vienen de la Sheet sin garantía de contraste.
@@ -531,7 +531,11 @@ function renderTratamientoForm(id) {
     location.hash = '#/tratamientos';
     await loadData();
     route();
-    showToast('Tratamiento guardado ✓');
+    if (data.proxima_fecha) {
+      showToast('Tratamiento guardado ✓');
+    } else {
+      showToast('Guardado ✓ — sin periodicidad ni próxima fecha, no aparecerá en el calendario ni en los recordatorios', 'warn');
+    }
   });
 }
 
