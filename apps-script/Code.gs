@@ -208,6 +208,7 @@ function getSheet(name) {
 
 function readAll(name) {
   const sheet = getSheet(name);
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
   const headers = values[0];
@@ -217,7 +218,11 @@ function readAll(name) {
       const obj = {};
       headers.forEach((h, i) => {
         let v = row[i];
-        if (v instanceof Date) v = v.toISOString().slice(0, 10);
+        // toISOString() pasa por UTC antes de recortar la fecha: con la Sheet en
+        // horario de España (UTC+1/+2) eso adelanta la medianoche local al día
+        // anterior en UTC, y proxima_fecha/fecha llegan al frontend un día antes
+        // de lo real. Formatear en la zona horaria de la Sheet evita el desfase.
+        if (v instanceof Date) v = Utilities.formatDate(v, tz, 'yyyy-MM-dd');
         obj[h] = v;
       });
       return obj;
@@ -310,8 +315,9 @@ function ensureSheet(ss, name, headers) {
 function dailyReminderCheck() {
   const tratamientos = readAll(SHEETS.TRATAMIENTOS);
   const usuarios = readAll(SHEETS.USUARIOS);
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
 
   tratamientos.forEach(t => {
     if (!t.proxima_fecha) return;
