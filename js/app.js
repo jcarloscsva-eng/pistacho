@@ -285,23 +285,37 @@ function renderTratamientos() {
     <div class="toolbar">
       <a href="#/tratamientos/nuevo" class="btn primary">+ Nuevo tratamiento</a>
     </div>
-    <table class="table">
+    <table class="table table-tratamientos">
       <thead>
-        <tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Coste</th><th>Seguro</th><th>Reembolsado</th><th>Próxima vez</th><th></th></tr>
+        <tr>
+          <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Coste</th>
+          <th class="col-extra">Seguro</th><th class="col-extra">Reembolsado</th><th class="col-extra">Próxima vez</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         ${rows.map(t => `
-          <tr>
+          <tr class="tr-main" onclick="toggleTratamientoRow(this)">
             <td>${fmtDate(t.fecha)}</td>
-            <td><span class="tag" style="background:${categoriaById(t.categoria_id).color}22;color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
+            <td><span class="tag" style="color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
             <td>${t.descripcion || ''}</td>
             <td>${fmtEUR(t.coste)}</td>
-            <td>${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
-            <td>${fmtEUR(t.importe_reembolsado)}</td>
-            <td>${fmtDate(t.proxima_fecha)}</td>
+            <td class="col-extra">${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</td>
+            <td class="col-extra">${fmtEUR(t.importe_reembolsado)}</td>
+            <td class="col-extra">${fmtDate(t.proxima_fecha)}</td>
             <td class="row-actions">
-              <a href="#/tratamientos/editar/${t.id}">Editar</a>
-              <a href="#" onclick="onDeleteTratamiento('${t.id}');return false;">Borrar</a>
+              <a href="#/tratamientos/editar/${t.id}" onclick="event.stopPropagation()">Editar</a>
+              <a href="#" onclick="event.stopPropagation();onDeleteTratamiento('${t.id}');return false;">Borrar</a>
+              <span class="chevron" aria-hidden="true">›</span>
+            </td>
+          </tr>
+          <tr class="tr-detail" hidden>
+            <td colspan="5">
+              <div class="detail-grid">
+                <div><span class="detail-label">Seguro</span>${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</div>
+                <div><span class="detail-label">Reembolsado</span>${fmtEUR(t.importe_reembolsado)}</div>
+                <div><span class="detail-label">Próxima vez</span>${fmtDate(t.proxima_fecha)}</div>
+              </div>
             </td>
           </tr>
         `).join('') || `<tr><td colspan="8" class="muted">Todavía no hay tratamientos.</td></tr>`}
@@ -309,6 +323,13 @@ function renderTratamientos() {
     </table>
   `;
   $app.innerHTML = layout('Tratamientos', content);
+}
+
+function toggleTratamientoRow(tr) {
+  const detail = tr.nextElementSibling;
+  if (!detail || !detail.classList.contains('tr-detail')) return;
+  const open = tr.classList.toggle('open');
+  detail.hidden = !open;
 }
 
 function renderTratamientoForm(id) {
@@ -534,7 +555,7 @@ function renderSeguro() {
             const cob = coberturaByCategoria(c.id) || {};
             return `
               <tr data-categoria="${c.id}">
-                <td><span class="tag" style="background:${c.color}22;color:${c.color}">${c.nombre}</span></td>
+                <td><span class="tag" style="color:${c.color}">${c.nombre}</span></td>
                 <td><input type="checkbox" class="cob-cubierta" ${cob.cubierta ? 'checked' : ''}></td>
                 <td><input type="number" min="0" max="100" class="cob-porcentaje" placeholder="general" value="${cob.porcentaje_especifico || ''}"></td>
                 <td><button class="btn small" onclick="onSaveCobertura('${c.id}')" type="button">Guardar</button></td>
