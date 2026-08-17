@@ -295,7 +295,7 @@ function renderTratamientos() {
       </thead>
       <tbody>
         ${rows.map(t => `
-          <tr class="tr-main" onclick="toggleTratamientoRow(this)">
+          <tr class="tr-main" onclick="openTratamientoSheet('${t.id}')">
             <td>${fmtDate(t.fecha)}</td>
             <td><span class="tag" style="color:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span></td>
             <td>${t.descripcion || ''}</td>
@@ -309,27 +309,54 @@ function renderTratamientos() {
               <span class="chevron" aria-hidden="true">›</span>
             </td>
           </tr>
-          <tr class="tr-detail" hidden>
-            <td colspan="5">
-              <div class="detail-grid">
-                <div><span class="detail-label">Seguro</span>${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</div>
-                <div><span class="detail-label">Reembolsado</span>${fmtEUR(t.importe_reembolsado)}</div>
-                <div><span class="detail-label">Próxima vez</span>${fmtDate(t.proxima_fecha)}</div>
-              </div>
-            </td>
-          </tr>
         `).join('') || `<tr><td colspan="8" class="muted">Todavía no hay tratamientos.</td></tr>`}
       </tbody>
     </table>
+    <div id="tr-sheet-backdrop" class="sheet-backdrop" onclick="closeTratamientoSheet()" hidden></div>
+    <div id="tr-sheet" class="sheet" hidden></div>
   `;
   $app.innerHTML = layout('Tratamientos', content);
 }
 
-function toggleTratamientoRow(tr) {
-  const detail = tr.nextElementSibling;
-  if (!detail || !detail.classList.contains('tr-detail')) return;
-  const open = tr.classList.toggle('open');
-  detail.hidden = !open;
+function openTratamientoSheet(id) {
+  const t = state.tratamientos.find(x => x.id === id);
+  if (!t) return;
+  const cat = categoriaById(t.categoria_id);
+  document.getElementById('tr-sheet').innerHTML = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span class="tag" style="color:${cat.color}">${cat.nombre}</span>
+      <strong>${t.descripcion || ''}</strong>
+    </div>
+    <div class="detail-grid">
+      <div><span class="detail-label">Fecha</span>${fmtDate(t.fecha)}</div>
+      <div><span class="detail-label">Coste</span>${fmtEUR(t.coste)}</div>
+      <div><span class="detail-label">Seguro</span>${t.cubierto_seguro ? `Sí (${t.porcentaje_aplicado || 0}%)` : 'No'}</div>
+      <div><span class="detail-label">Reembolsado</span>${fmtEUR(t.importe_reembolsado)}</div>
+      <div><span class="detail-label">Próxima vez</span>${fmtDate(t.proxima_fecha)}</div>
+    </div>
+    <div class="sheet-actions">
+      <a href="#/tratamientos/editar/${t.id}" class="btn primary">Editar</a>
+      <button type="button" class="btn danger" onclick="closeTratamientoSheet();onDeleteTratamiento('${t.id}')">Borrar</button>
+    </div>
+  `;
+  const backdrop = document.getElementById('tr-sheet-backdrop');
+  const sheet = document.getElementById('tr-sheet');
+  backdrop.hidden = false;
+  sheet.hidden = false;
+  requestAnimationFrame(() => {
+    backdrop.classList.add('show');
+    sheet.classList.add('show');
+  });
+}
+
+function closeTratamientoSheet() {
+  const backdrop = document.getElementById('tr-sheet-backdrop');
+  const sheet = document.getElementById('tr-sheet');
+  if (!backdrop || !sheet) return;
+  backdrop.classList.remove('show');
+  sheet.classList.remove('show');
+  setTimeout(() => { backdrop.hidden = true; sheet.hidden = true; }, 200);
 }
 
 function renderTratamientoForm(id) {
