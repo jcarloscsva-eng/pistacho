@@ -1,15 +1,16 @@
 :root {
-  --primary: #2e7d5e;
-  --primary-dark: #1f5c44;
-  --bg: #eef0e6;
+  --primary: #0d8577;
+  --primary-dark: #075a52;
+  --bg: #f4faf9;
   --card-bg: #ffffff;
-  --border: #dcdfd0;
-  --text: #212a1f;
-  --muted: #63705c;
+  --border: #cfe8e3;
+  --text: #10302b;
+  --muted: #4f6b66;
   --danger: #b3432b;
   --warn: #c98a1f;
-  --good: #2e7d5e;
-  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --good: #0d8577;
+  --subtle-bg: #eef6f4;
+  --font-display: 'Lora', Georgia, 'Times New Roman', serif;
 }
 * { box-sizing: border-box; }
 body {
@@ -108,7 +109,7 @@ a { color: var(--primary-dark); }
 .muted { color: var(--muted); font-size: 14px; }
 
 .reminder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.reminder-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 10px; background: #faf9f4; }
+.reminder-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 10px; background: var(--subtle-bg); }
 .reminder-list li.soon { background: #fdf3e3; }
 .reminder-list li.overdue { background: #fbe9e5; }
 .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
@@ -123,7 +124,7 @@ a { color: var(--primary-dark); }
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; }
 .table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-variant-numeric: tabular-nums; }
 .table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
-.table th { background: #faf9f4; font-weight: 700; color: var(--muted); font-variant-numeric: normal; }
+.table th { background: var(--subtle-bg); font-weight: 700; color: var(--muted); font-variant-numeric: normal; }
 .row-actions a { margin-right: 10px; font-size: 13px; }
 .table-tratamientos tr.tr-main { cursor: pointer; }
 .table-tratamientos tr.tr-main:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
@@ -253,7 +254,7 @@ a { color: var(--primary-dark); }
 }
 .cal-cell.empty { background: transparent; border: none; }
 .cal-cell.today { border-color: var(--primary); border-width: 2px; }
-.cal-cell.has-events { background: #faf9f4; }
+.cal-cell.has-events { background: var(--subtle-bg); }
 .cal-daynum { font-size: 12px; font-weight: 700; color: var(--muted); }
 .cal-event {
   font-size: 11px;
