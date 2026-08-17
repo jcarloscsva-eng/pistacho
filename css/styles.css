@@ -120,6 +120,7 @@ a { color: var(--primary-dark); }
 .bar-fill { background: var(--primary); height: 100%; }
 .bar-value { font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; }
 .table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-variant-numeric: tabular-nums; }
 .table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
 .table th { background: #faf9f4; font-weight: 700; color: var(--muted); font-variant-numeric: normal; }
@@ -318,6 +319,7 @@ a { color: var(--primary-dark); }
     color: var(--muted);
     font-size: 18px;
   }
+  .table-tratamientos .tag { font-size: 10px; padding: 2px 8px; }
 
   .sheet-actions { flex-direction: column-reverse; }
 }
