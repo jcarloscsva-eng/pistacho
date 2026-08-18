@@ -383,6 +383,21 @@ function renderTratamientos() {
         </tbody>
       </table>
     </div>
+    <div class="tr-cards">
+      ${rows.map(t => `
+        <div class="tr-card" tabindex="0" onclick="openTratamientoSheet('${t.id}')" onkeydown="if(event.key==='Enter'){openTratamientoSheet('${t.id}')}">
+          <div class="tr-card-top">
+            <span class="tr-card-date">${fmtDate(t.fecha)}</span>
+            <span class="tag" style="color:${readableCategoryColor(categoriaById(t.categoria_id).color)};--tag-accent:${categoriaById(t.categoria_id).color}">${categoriaById(t.categoria_id).nombre}</span>
+          </div>
+          ${t.descripcion ? `<div class="tr-card-desc">${t.descripcion}</div>` : ''}
+          <div class="tr-card-bottom">
+            <span class="tr-card-coste">${fmtEUR(t.coste)}</span>
+            <span class="chevron" aria-hidden="true">›</span>
+          </div>
+        </div>
+      `).join('') || `<p class="muted">Todavía no hay tratamientos.</p>`}
+    </div>
     <div id="tr-sheet-backdrop" class="sheet-backdrop" onclick="closeTratamientoSheet()" hidden></div>
     <div id="tr-sheet" class="sheet" hidden></div>
   `;
