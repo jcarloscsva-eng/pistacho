@@ -129,6 +129,19 @@ a { color: var(--primary-dark); }
 .table-tratamientos tr.tr-main { cursor: pointer; }
 .table-tratamientos tr.tr-main:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
+.tr-cards { display: none; flex-direction: column; gap: 10px; }
+.tr-card {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; cursor: pointer;
+}
+.tr-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tr-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.tr-card-date { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tr-card-desc { font-size: 14px; margin-bottom: 8px; }
+.tr-card-bottom { display: flex; align-items: center; justify-content: space-between; }
+.tr-card-coste { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tr-card .chevron { display: inline-block; color: var(--muted); font-size: 18px; }
+
 .tag {
   display: inline-flex;
   align-items: center;
@@ -138,6 +151,8 @@ a { color: var(--primary-dark); }
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
   border: 1.5px solid var(--tag-accent, currentColor);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag-accent, currentColor) 16%, transparent) inset;
   transform: rotate(-1.5deg);
@@ -352,16 +367,9 @@ a { color: var(--primary-dark); }
   .cal-cell { min-height: 56px; }
   .cal-event { font-size: 9px; }
 
-  .table-tratamientos .col-extra { display: none; }
-  .table-tratamientos .row-actions { display: flex; align-items: center; justify-content: flex-end; }
-  .table-tratamientos .row-actions a { display: none; }
-  .table-tratamientos .chevron {
-    display: inline-block;
-    color: var(--muted);
-    font-size: 18px;
-  }
-  .table-tratamientos .tag { font-size: 10px; padding: 2px 8px; }
-  .table-tratamientos td:nth-child(3) { max-width: 38vw; }
+  .table-scroll { display: none; }
+  .tr-cards { display: flex; }
+
   .sheet-actions { flex-direction: column-reverse; }
 }
 
