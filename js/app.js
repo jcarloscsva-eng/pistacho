@@ -45,6 +45,23 @@ const $app = document.getElementById('app');
 
 // ---------- Utilidades ----------
 
+// Sugerencia de periodicidad (meses) según el nombre de categoría, orientativa
+// según el mismo criterio que la Guía — el usuario siempre puede cambiarla.
+function normalizarTexto(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+function periodicidadSugerida(nombreCategoria) {
+  const n = normalizarTexto(nombreCategoria);
+  if (n.includes('rabia')) return 12;
+  if (n.includes('polivalente')) return 12;
+  if (n.includes('leishmaniosis')) return 12;
+  if (n.includes('interna')) return 3;
+  if (n.includes('externa')) return 1;
+  if (n.includes('revision') || n.includes('chequeo')) return 12;
+  if (n.includes('analitica')) return 12;
+  return null;
+}
+
 function fmtEUR(n) {
   return (Number(n) || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 }
@@ -493,7 +510,7 @@ function renderTratamientoForm(id) {
         <input type="checkbox" name="cubierto_seguro" ${editing ? (editing.cubierto_seguro ? 'checked' : '') : (cobertura && cobertura.cubierta ? 'checked' : '')}>
         Cubierto por el seguro
       </label>
-      <label>Periodicidad (meses) — para calcular el próximo recordatorio
+      <label>Periodicidad (meses) — se sugiere sola según la categoría, pero puedes cambiarla
         <input type="number" min="0" name="periodicidad_meses" value="${editing ? editing.periodicidad_meses || '' : ''}">
       </label>
       <label>Próxima fecha (se calcula sola si pones periodicidad, pero puedes ajustarla)
@@ -511,6 +528,15 @@ function renderTratamientoForm(id) {
   $app.innerHTML = layout(editing ? 'Editar tratamiento' : 'Nuevo tratamiento', content);
 
   const form = document.getElementById('tratamiento-form');
+
+  const categoriaSelect = form.querySelector('select[name="categoria_id"]');
+  const periodicidadInput = form.querySelector('input[name="periodicidad_meses"]');
+  categoriaSelect.addEventListener('change', () => {
+    if (periodicidadInput.value) return; // no pisar un valor que ya haya puesto el usuario
+    const sugerida = periodicidadSugerida(categoriaById(categoriaSelect.value).nombre);
+    if (sugerida) periodicidadInput.value = sugerida;
+  });
+
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const fd = new FormData(form);
