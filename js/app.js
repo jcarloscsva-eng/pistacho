@@ -56,7 +56,8 @@ function periodicidadSugerida(nombreCategoria) {
   if (n.includes('polivalente')) return 12;
   if (n.includes('leishmaniosis')) return 12;
   if (n.includes('interna')) return 3;
-  if (n.includes('externa')) return 1;
+  if (n.includes('collar')) return 6;
+  if (n.includes('pipeta') || n.includes('externa')) return 1;
   if (n.includes('revision') || n.includes('chequeo')) return 12;
   if (n.includes('analitica')) return 12;
   return null;
@@ -197,6 +198,16 @@ function route() {
   else renderDashboard();
 }
 window.addEventListener('hashchange', route);
+
+// Red de seguridad: si algo falla sin que el código lo capture explícitamente
+// (fallo de red, excepción de JS...), que se vea en pantalla en vez de
+// desaparecer en silencio.
+window.addEventListener('unhandledrejection', (ev) => {
+  showToast('Error inesperado: ' + (ev.reason && ev.reason.message || ev.reason), 'error');
+});
+window.addEventListener('error', (ev) => {
+  showToast('Error inesperado: ' + ev.message, 'error');
+});
 
 async function loadData() {
   const res = await Api.bootstrap();
@@ -539,43 +550,47 @@ function renderTratamientoForm(id) {
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const fd = new FormData(form);
-    const categoriaId = fd.get('categoria_id');
-    const cub = coberturaByCategoria(categoriaId);
-    const cubiertoSeguro = fd.get('cubierto_seguro') === 'on';
-    const coste = Number(fd.get('coste'));
-    const porcentaje = cubiertoSeguro
-      ? Number((cub && cub.porcentaje_especifico) || (state.seguro && state.seguro.porcentaje_reembolso_general) || 0)
-      : 0;
+    try {
+      const fd = new FormData(form);
+      const categoriaId = fd.get('categoria_id');
+      const cub = coberturaByCategoria(categoriaId);
+      const cubiertoSeguro = fd.get('cubierto_seguro') === 'on';
+      const coste = Number(fd.get('coste'));
+      const porcentaje = cubiertoSeguro
+        ? Number((cub && cub.porcentaje_especifico) || (state.seguro && state.seguro.porcentaje_reembolso_general) || 0)
+        : 0;
 
-    let proximaFecha = fd.get('proxima_fecha');
-    const periodicidad = fd.get('periodicidad_meses');
-    if (!proximaFecha && periodicidad) proximaFecha = addMonths(fd.get('fecha'), periodicidad);
+      let proximaFecha = fd.get('proxima_fecha');
+      const periodicidad = fd.get('periodicidad_meses');
+      if (!proximaFecha && periodicidad) proximaFecha = addMonths(fd.get('fecha'), periodicidad);
 
-    const data = {
-      id: editing ? editing.id : undefined,
-      fecha: fd.get('fecha'),
-      categoria_id: categoriaId,
-      descripcion: fd.get('descripcion'),
-      coste,
-      cubierto_seguro: cubiertoSeguro,
-      porcentaje_aplicado: porcentaje,
-      importe_reembolsado: Math.round(coste * porcentaje) / 100,
-      periodicidad_meses: periodicidad,
-      proxima_fecha: proximaFecha,
-      notas: fd.get('notas')
-    };
+      const data = {
+        id: editing ? editing.id : undefined,
+        fecha: fd.get('fecha'),
+        categoria_id: categoriaId,
+        descripcion: fd.get('descripcion'),
+        coste,
+        cubierto_seguro: cubiertoSeguro,
+        porcentaje_aplicado: porcentaje,
+        importe_reembolsado: Math.round(coste * porcentaje) / 100,
+        periodicidad_meses: periodicidad,
+        proxima_fecha: proximaFecha,
+        notas: fd.get('notas')
+      };
 
-    const res = editing ? await Api.updateTratamiento(data) : await Api.createTratamiento(data);
-    if (res.error) { showToast('No se ha podido guardar: ' + res.error, 'error'); return; }
-    state.loaded = false;
-    location.hash = '#/tratamientos';
-    await loadData();
-    route();
-    if (data.proxima_fecha) {
-      showToast('Tratamiento guardado ✓');
-    } else {
-      showToast('Guardado ✓ — sin periodicidad ni próxima fecha, no aparecerá en el calendario ni en los recordatorios', 'warn');
+      const res = editing ? await Api.updateTratamiento(data) : await Api.createTratamiento(data);
+      if (res.error) { showToast('No se ha podido guardar: ' + res.error, 'error'); return; }
+      state.loaded = false;
+      location.hash = '#/tratamientos';
+      await loadData();
+      route();
+      if (data.proxima_fecha) {
+        showToast('Tratamiento guardado ✓');
+      } else {
+        showToast('Guardado ✓ — sin periodicidad ni próxima fecha, no aparecerá en el calendario ni en los recordatorios', 'warn');
+      }
+    } catch (e) {
+      showToast('Error inesperado al guardar: ' + e.message, 'error');
     }
   });
 }
